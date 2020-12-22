@@ -74,7 +74,6 @@ def open_atomic(filepath: Path, *args, **kwargs):
         Any valid keyword arguments for :code:`open`
     """
     fsync = kwargs.get('fsync', False)
-
     with tempfile(dir=filepath.parent) as tmppath:
         with open(tmppath, *args, **kwargs) as file:
             try:
@@ -108,8 +107,16 @@ async def upload_file(request: web.Request) -> web.Response:
     if not file_dir.exists():
         file_dir.mkdir(parents=True)
 
-    with open_atomic(file_dir / file_hash, "wb") as f:
-        f.write(body)
+    file_path: Path = file_dir / file_hash
+    create_file_flag = False
+    if not file_path.exists():
+        create_file_flag = True
+    elif len(body) != file_path.stat().st_size:
+        file_path.unlink()
+        create_file_flag = True
+    if create_file_flag:
+        with open_atomic(file_path, "wb") as f:
+            f.write(body)
 
     return web.json_response(
         {
